@@ -25,7 +25,7 @@ import org.apache.hadoop.hive.conf.HiveConf
 import au.com.cba.omnia.ebenezer.scrooge.PartitionParquetScroogeSource
 
 import au.com.cba.omnia.maestro.core.partition.Partition
-import au.com.cba.omnia.maestro.core.hive.HiveTable
+import au.com.cba.omnia.maestro.core.hive.{PartitionedHiveTable, UnpartitionedHiveTable, HiveTable}
 import au.com.cba.omnia.maestro.core.scalding.StatKeys
 
 /** Executions for view tasks */
@@ -46,20 +46,18 @@ trait ViewExecution {
   }
 
   /**
-    * Partitions a pipe using the given partition scheme and writes out the data to a hive table.
+    * Writes out the data to a hive table.
     *
     * This will create the table if it doesn't already exist. If the existing schema doesn't match
     * the schema expected the job will fail.
     *
-    * @param append iff true add files to an already existing partition.
+    * @param append iff true add files to an already existing table.
     * @return the number of rows written.
     */
-  def viewHive[A <: ThriftStruct : Manifest, B : Manifest : TupleSetter]
-    (table: HiveTable[A, B], append: Boolean = true)
+  def viewHive[A <: ThriftStruct : Manifest, ST]
+    (table: HiveTable[A, ST], append: Boolean = true)
     (pipe: TypedPipe[A]): Execution[Long] = {
-    pipe
-      .map(v => table.partition.extract(v) -> v)
-      .writeExecution(table.sink(append))
+    table.writeExecution(pipe, append)
       .getAndResetCounters
       .map { case (_, counters) => counters.get(StatKeys.tuplesWritten).get }
   }

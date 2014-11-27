@@ -16,11 +16,11 @@ package au.com.cba.omnia.maestro.core.task
 
 import au.com.cba.omnia.thermometer.core.{Thermometer, ThermometerSource, ThermometerSpec}, Thermometer._
 import au.com.cba.omnia.thermometer.fact.PathFactoid
-import au.com.cba.omnia.thermometer.fact.PathFactoids._
 import au.com.cba.omnia.thermometer.hive.HiveSupport
 
 import au.com.cba.omnia.maestro.core.data.Field
 import au.com.cba.omnia.maestro.core.hive.HiveTable
+import au.com.cba.omnia.maestro.core.hive.UnpartitionedHiveTable
 import au.com.cba.omnia.maestro.core.partition.Partition
 
 import au.com.cba.omnia.maestro.core.thrift.scrooge.StringPair
@@ -32,12 +32,18 @@ object ViewExecutionSpec extends ThermometerSpec with HiveSupport { def is = s2"
 View execution properties
 =========================
 
-  can view using execution monad                          $normal
-  view executions can be composed with zip                $zipped
+  partitioned:
+    can view using execution monad                          $normal
+    view executions can be composed with zip                $zipped
 
-  can view in a hive table using execution monad          $normalHive
-  view hive executions can be composed with flatMap       $flatMappedHive
-  view hive executions can be composed with zip           $zippedHive
+    can view in a hive table using execution monad          $normalHive
+    view hive executions can be composed with flatMap       $flatMappedHive
+    view hive executions can be composed with zip           $zippedHive
+
+  unpartitioned:
+    can view in a hive table using execution monad          $normalHiveUnpartitioned
+    view hive executions can be composed with flatMap       $flatMappedHiveUnpartitioned
+    view hive executions can be composed with zip           $zippedHiveUnpartitioned
 """
 
   def normal = {
@@ -96,6 +102,46 @@ View execution properties
     )
   }
 
+  def normalHiveUnpartitioned = {
+    val exec = ViewExec.viewHive(tableUnpartitioned("unpart"))(source)
+    executesSuccessfully(exec) must_== 4
+    facts(
+      hiveWarehouse </> "unpart.db" </> "unpart_table" </> "part-*.parquet" ==> matchesFile
+    )
+  }
+
+  def flatMappedHiveUnpartitioned = {
+    val exec = for {
+      count1 <- ViewExec.viewHive(tableUnpartitioned("flatMappedHiveUnpart1"))(source)
+      count2 <- ViewExec.viewHive(tableUnpartitioned("flatMappedHiveUnpart2"))(source)
+    } yield (count1, count2)
+    executesSuccessfully(exec) must_== ((4, 4))
+    facts(
+      hiveWarehouse </> "flatmappedhiveunpart1.db" </> "unpart_table" </> "part-*.parquet" ==> matchesFile,
+      hiveWarehouse </> "flatmappedhiveunpart2.db" </> "unpart_table" </> "part-*.parquet" ==> matchesFile
+    )
+  }
+
+  def zippedHiveUnpartitioned = {
+    val zipData = List(
+      StringPair("C", "3"),
+      StringPair("C", "4"),
+      StringPair("D", "3"),
+      StringPair("D", "4")
+    )
+    val zipSource = ThermometerSource(zipData)
+
+    val exec = ViewExec.viewHive(tableUnpartitioned("zippedHiveUnpart"))(source)
+      .zip(ViewExec.viewHive(tableUnpartitioned("zippedHiveUnpart2"))(zipSource))
+    executesSuccessfully(exec) must_== ((4, 4))
+    facts(
+      hiveWarehouse </> "zippedhiveunpart.db" </> "unpart_table" </> "part-*.parquet" ==> matchesFile,
+      hiveWarehouse </> "zippedhiveunpart2.db" </> "unpart_table" </> "part-*.parquet" ==> matchesFile
+    )
+  }
+
+  def tableUnpartitioned(database: String) =
+    HiveTable[StringPair](database, "unpart_table", None)
 
   def tableByFirst(database: String) =
     HiveTable(database, "by_first", byFirst, None)
@@ -113,6 +159,6 @@ View execution properties
     StringPair("B", "1"),
     StringPair("B", "2")
   )
-
+  
   def matchesFile = PathFactoid((context, path) => !context.glob(path).isEmpty)
 }
