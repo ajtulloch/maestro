@@ -21,41 +21,44 @@ import org.joda.time.{DateTime, DateTimeZone}
 import au.com.cba.omnia.maestro.api.exec.MaestroExecution
 import au.com.cba.omnia.maestro.example.thrift.Customer
 
-import au.com.cba.omnia.parlour.SqoopSyntax.ParlourImportDsl
+import au.com.cba.omnia.parlour.ParlourImportOptions
 
 /** Please be aware that the Execution API is being actively developed/modified and
   * hence not officially supported or ready for production use yet.
   */
 object CustomerSqoopImportExecution extends MaestroExecution[Customer] {
-  def execute(
-    hdfsRoot: String, 
-    connectionString: String, 
-    username: String, 
-    password: String,
-    options: ParlourImportDsl
-  ): Execution[CustomerImportStatus] = {
-    val source     = "sales"
-    val domain     = "books"
-    val table      = "customer_import"
-    val errors     = s"${hdfsRoot}/errors/${domain}"
-    val timeSource = TimeSource.now()
-    val filter     = RowFilter.keep
-    val cleaners   = Clean.all(Clean.trim, Clean.removeNonPrintables)
-    val validators = Validator.all[Customer]()
-    val timePath   = DateTime.now(DateTimeZone.UTC).toString(List("yyyy","MM", "dd") mkString File.separator)
-    val catTable   = HiveTable("customer", "by_cat", Partition.byField(Fields.Cat))
+  /** Configuration for `CustomerSqoopImportExecution` */
+  case class SqoopImportConfig[T <: ParlourImportOptions[T]](config: Config, options: T) {
+    val maestro = MaestroConfig(
+      conf      = config,
+      source    = "sales",
+      domain    = "books",
+      tablename = "customer_import"
+    )
+    val load    = maestro.load(
+      none      = "null"
+    )
 
-    val importOptions = createSqoopImportOptions(connectionString, username, 
-      password, table, '|', "", None, options).splitBy("id")
-
-    for {
-      (path, sqoopCount) <- sqoopImport(hdfsRoot, source, domain, timePath, importOptions)
-      (pipe, loadInfo)   <- load[Customer]("|", List(path), errors, timeSource, cleaners, validators, filter, "null")
-      if loadInfo.continue
-      loadCount = loadInfo.asInstanceOf[LoadSuccess].written
-      hiveCount          <- viewHive(catTable)(pipe)
-    } yield (CustomerImportStatus(sqoopCount, loadCount, hiveCount))
+    // TODO will be moved into config classes shortly
+    // TODO some hiveQuery config not moved here, will also move into config classes shortly
+    val timePath      = maestro.loadTime.toString("yyyy/MM/dd")
+    val connString    = maestro.args("jdbc")
+    val username      = maestro.args("db-user")
+    val password      = Option(System.getenv("DBPASSWORD")).getOrElse("")
+    val importOptions = createSqoopImportOptions(connString, username, password, maestro.tablename, '|', "", None, options).splitBy("id")
+    val catTable      = HiveTable("customer", "by_cat",  Partition.byField(Fields.Cat))
   }
+
+  /** Create an example customer sqoop import execution */
+  def execute[T <: ParlourImportOptions[T]](
+    options: T
+  ): Execution[CustomerImportStatus] = for {
+    conf               <- Execution.getConfig.map(SqoopImportConfig(_, options))
+    (path, sqoopCount) <- sqoopImport(conf.maestro.hdfsRoot, conf.maestro.source, conf.maestro.domain, conf.timePath, conf.importOptions)
+    (pipe, loadInfo)   <- load[Customer](conf.load)(List(path))
+    loadSuccess        <- loadInfo.continueWithStats
+    hiveCount          <- viewHive(conf.catTable)(pipe)
+  } yield (CustomerImportStatus(sqoopCount, loadSuccess.written, hiveCount))
 }
 
 case class CustomerImportStatus(sqoopCount: Long, loadCount: Long, hiveCount: Long)

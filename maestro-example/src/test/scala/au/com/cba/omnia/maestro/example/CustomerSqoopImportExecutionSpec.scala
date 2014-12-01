@@ -16,10 +16,6 @@ package au.com.cba.omnia.maestro.example
 
 import scalikejdbc.{SQL, AutoSession, ConnectionPool}
 
-import au.com.cba.omnia.maestro.macros.Macros
-import au.com.cba.omnia.maestro.test.Records
-import au.com.cba.omnia.maestro.example.thrift.Customer
-
 import au.com.cba.omnia.parlour.SqoopSyntax.ParlourImportDsl
 
 import au.com.cba.omnia.thermometer.hive.HiveSupport
@@ -28,7 +24,17 @@ import au.com.cba.omnia.thermometer.fact.PathFactoids._
 
 import au.com.cba.omnia.ebenezer.test.ParquetThermometerRecordReader
 
-object CustomerSqoopImportExecutionSpec extends ThermometerSpec with Records with HiveSupport { def is = s2"""
+import au.com.cba.omnia.maestro.api.exec.MaestroExecution
+
+import au.com.cba.omnia.maestro.test.Records
+
+import au.com.cba.omnia.maestro.example.thrift.Customer
+
+object CustomerSqoopImportExecutionSpec
+  extends ThermometerSpec
+  with Records
+  with HiveSupport
+  with MaestroExecution[Customer] { def is = s2"""
 
 CustomerSqoopImportExecution test
 =================================
@@ -40,23 +46,23 @@ CustomerSqoopImportExecution test
   val username         = "sa"
   val password         = ""
   val mapRedHome       = s"${System.getProperty("user.home")}/.ivy2/cache"
-  val decoder          = Macros.mkDecode[Customer]
 
   def pipeline = {
     val actualReader   = ParquetThermometerRecordReader[Customer]
-    val expectedReader = delimitedThermometerRecordReader[Customer]('|', "null", decoder)
+    val expectedReader = delimitedThermometerRecordReader[Customer]('|', "null", implicitly[Decode[Customer]])
 
     CustomerImport.tableSetup(connectionString, username, password)
     val execution = CustomerSqoopImportExecution.execute(
-      s"$dir/user/hdfs",
-      connectionString,
-      username,
-      password,
       ParlourImportDsl().hadoopMapRedHome(mapRedHome)
+    )
+    val args = Map(
+      "hdfs-root" -> List(s"$dir/user/hdfs"),
+      "jdbc"      -> List(connectionString),
+      "db-user"   -> List(username)
     )
 
     withEnvironment(path(getClass.getResource("/sqoop-customer/import").toString)) {
-      executesSuccessfully(execution) === CustomerImportStatus(6, 6, 6)
+      executesSuccessfully(execution, args) === CustomerImportStatus(6, 6, 6)
 
       facts(
         hiveWarehouse </> "customer.db" </> "by_cat"  ==>

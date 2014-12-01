@@ -20,13 +20,17 @@ import au.com.cba.omnia.thermometer.fact.PathFactoids._
 
 import au.com.cba.omnia.ebenezer.test.ParquetThermometerRecordReader
 
-import au.com.cba.omnia.maestro.api._
+import au.com.cba.omnia.maestro.api.exec.MaestroExecution
+
 import au.com.cba.omnia.maestro.test.Records
-import au.com.cba.omnia.maestro.core.task.LoadSuccess
 
 import au.com.cba.omnia.maestro.example.thrift.Customer
 
-object CustomerExecutionSpec extends ThermometerSpec with Records with HiveSupport { def is = s2"""
+object CustomerExecutionSpec
+  extends ThermometerSpec
+  with Records
+  with HiveSupport
+  with MaestroExecution[Customer] { def is = s2"""
 
 Customer Execution
 ==================
@@ -35,14 +39,17 @@ Customer Execution
 
 """
 
-  lazy val decoder = Macros.mkDecode[Customer]
-
   def pipeline = {
     val actualReader   = ParquetThermometerRecordReader[Customer]
-    val expectedReader = delimitedThermometerRecordReader[Customer]('|', "null", decoder)
+    val expectedReader = delimitedThermometerRecordReader[Customer]('|', "null", implicitly[Decode[Customer]])
 
     withEnvironment(path(getClass.getResource("/customer").toString)) {
-      executesSuccessfully(CustomerExecution.execute(s"$dir/user", s"$dir/user", s"$dir/user/archive")) must_== ((
+      val args = Map(
+        "hdfs-root"    -> List(s"$dir/user"),
+        "local-root"   -> List(s"$dir/user"),
+        "archive-root" -> List(s"$dir/user/archive")
+      )
+      executesSuccessfully(CustomerExecution.execute, args) must_== ((
         LoadSuccess(8, 8, 0),
         8
       ))

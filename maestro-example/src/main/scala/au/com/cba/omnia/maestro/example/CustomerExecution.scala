@@ -19,41 +19,46 @@ import org.apache.hadoop.hive.conf.HiveConf.ConfVars._
 import au.com.cba.omnia.maestro.api.exec.MaestroExecution
 import au.com.cba.omnia.maestro.example.thrift.{Account, Customer}
 
+/** Please be aware that the Execution API is being actively developed/modified and
+  * hence not officially supported or ready for production use yet.
+  */
 object CustomerExecution extends MaestroExecution[Customer] {
-  def execute(hdfsRoot: String, localRoot: String, archiveRoot: String): Execution[(LoadInfo, Long)] = {
-    val source      = "customer"
-    val domain      = "customer"
-    val tablename   = "customer"
-    val errors      = s"${hdfsRoot}/errors/${domain}"
-    val timeSource  = TimeSource.fromDirStructure
-    val validators  = Validator.all[Customer]()
-    val filter      = RowFilter.keep
-    val cleaners    = Clean.all(
-      Clean.trim,
-      Clean.removeNonPrintables
+  /** Configuration for a customer execution example */
+  case class CustomerConfig(config: Config) {
+    val maestro = MaestroConfig(
+      conf      = config,
+      source    = "customer",
+      domain    = "customer",
+      tablename = "customer"
     )
-    val dateTable =
-      HiveTable(domain, "by_date", Partition.byDate(Fields.EffectiveDate) )
-    val catTable  =
-      HiveTable(domain, "by_cat", Partition.byField(Fields.Cat))
+    val load    = maestro.load(
+      none      = "null"
+    )
 
-    for {
-      uploadInfo <- upload(source, domain, tablename, "{table}_{yyyyMMdd}.txt", localRoot, archiveRoot, hdfsRoot)
-
-      if uploadInfo.continue
-      (pipe, loadInfo) <- load[Customer](
-        "|", uploadInfo.files, errors, timeSource,
-        cleaners, validators, filter, "null"
-      )
-
-      if loadInfo.continue
-      (count1, _) <- viewHive(dateTable)(pipe).zip(viewHive(catTable)(pipe))
-      _           <- hiveQuery(
-        "test", catTable,
-        Map(HIVEMERGEMAPFILES -> "true"),
-        s"INSERT OVERWRITE TABLE ${catTable.name} PARTITION (partition_cat) SELECT id, name, acct, cat, sub_cat, -10, effective_date, cat AS partition_cat FROM ${dateTable.name}",
-        s"SELECT COUNT(*) FROM ${catTable.name}"
-      )
-    } yield (loadInfo, count1)
+    // TODO will be moved into config classes shortly
+    // TODO some hiveQuery config not moved here, will also move into config classes shortly
+    val filePattern = "{table}_{yyyyMMdd}.txt"
+    val localRoot   = maestro.args("local-root")
+    val archiveRoot = maestro.args("archive-root")
+    val dateTable   = HiveTable(maestro.domain, "by_date", Partition.byDate(Fields.EffectiveDate))
+    val catTable    = HiveTable(maestro.domain, "by_cat",  Partition.byField(Fields.Cat))
   }
+
+  /** Create an example customer execution */
+  def execute: Execution[(LoadInfo, Long)] = for {
+    conf       <- Execution.getConfig.map(CustomerConfig(_))
+    uploadInfo <- upload(conf.maestro.source, conf.maestro.domain, conf.maestro.tablename, conf.filePattern, conf.localRoot, conf.archiveRoot, conf.maestro.hdfsRoot)
+
+    if uploadInfo.continue
+    (pipe, loadInfo) <- load[Customer](conf.load)(uploadInfo.files)
+
+    if loadInfo.continue
+    (count1, _) <- viewHive(conf.dateTable)(pipe) zip viewHive(conf.catTable)(pipe)
+    _           <- hiveQuery(
+      "test", conf.catTable,
+      Map(HIVEMERGEMAPFILES -> "true"),
+      s"INSERT OVERWRITE TABLE ${conf.catTable.name} PARTITION (partition_cat) SELECT id, name, acct, cat, sub_cat, -10, effective_date, cat AS partition_cat FROM ${conf.dateTable.name}",
+      s"SELECT COUNT(*) FROM ${conf.catTable.name}"
+    )
+  } yield (loadInfo, count1)
 }

@@ -12,8 +12,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 
-package au.com.cba.omnia.maestro.core
-package task
+package au.com.cba.omnia.maestro.core.exec
 
 import au.com.cba.omnia.thermometer.core.{ThermometerSpec, Thermometer}, Thermometer._
 
@@ -21,6 +20,8 @@ import au.com.cba.omnia.maestro.core.clean.Clean
 import au.com.cba.omnia.maestro.core.codec.{Decode, Tag}
 import au.com.cba.omnia.maestro.core.data.Field
 import au.com.cba.omnia.maestro.core.filter.RowFilter
+import au.com.cba.omnia.maestro.core.split.Splitter
+import au.com.cba.omnia.maestro.core.task.LoadTestUtil
 import au.com.cba.omnia.maestro.core.validate.Validator
 
 import au.com.cba.omnia.maestro.core.thrift.scrooge.StringPair
@@ -42,41 +43,41 @@ Load execution properties
 
   def normal = {
     withEnvironment(path(getClass.getResource("/load-execution").toString)) {
-      executesSuccessfully(LoadExec.load[StringPair](
-        "|", List("normal"), "errors", now, clean, validator, RowFilter.keep, "null"
-      ))._2 must_== LoadSuccess(4, 4, 0)
+      val exec = LoadExec.load[StringPair](conf)(List("normal"))
+      executesSuccessfully(exec)._2 must_== LoadSuccess(4, 4, 0)
     }
   }
 
   def fixed = {
     withEnvironment(path(getClass.getResource("/load-execution").toString)) {
-      executesSuccessfully(LoadExec.loadFixedLength[StringPair](
-        List(4), List("fixed"), "errors", now, clean, validator, RowFilter.keep, "null"
-      ))._2 must_== LoadSuccess(4, 4, 0)
+      val fixedConf = conf.copy(splitter = Splitter.fixed(List(4)))
+      val exec = LoadExec.load[StringPair](fixedConf)(List("fixed"))
+      executesSuccessfully(exec)._2 must_== LoadSuccess(4, 4, 0)
     }
   }
 
   def noData = {
     withEnvironment(path(getClass.getResource("/load-execution").toString)) {
-      executesSuccessfully(LoadExec.load[StringPair](
-        "|", List("no-data"), "errors", now, clean, validator, RowFilter.keep, "null"
-      ))._2 must_== EmptyLoad
+      val exec = LoadExec.load[StringPair](conf)(List("no-data"))
+      executesSuccessfully(exec)._2 must_== EmptyLoad
     }
   }
 
   def someErrors = {
     withEnvironment(path(getClass.getResource("/load-execution").toString)) {
-      executesSuccessfully(LoadExec.load[StringPair](
-        "|", List("some-errors"), "errors", now, clean, validator, RowFilter.keep, "null", 0.25
-      ))._2 must_== LoadSuccess(5, 4, 1)
+      val tolerantConf = conf.copy(errorThreshold = 0.25)
+      val exec = LoadExec.load[StringPair](tolerantConf)(List("some-errors"))
+      executesSuccessfully(exec)._2 must_== LoadSuccess(5, 4, 1)
     }
   }
 
   def manyErrors = {
     withEnvironment(path(getClass.getResource("/load-execution").toString)) {
-      executesSuccessfully(LoadExec.load[StringPair](
-        "|", List("many-errors"), "errors", now, clean, validator, RowFilter.keep, "null", 0.25
-      ))._2 must_== LoadFailure(5, 3, 2)
+      val tolerantConf = conf.copy(errorThreshold = 0.25)
+      val exec = LoadExec.load[StringPair](tolerantConf)(List("many-errors"))
+      executesSuccessfully(exec)._2 must_== LoadFailure(5, 3, 2)
     }
   }
+
+  def conf = LoadConfig[StringPair](errors = "errors", timeSource = now, none = "null")
 }
