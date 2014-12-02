@@ -18,7 +18,6 @@ import com.twitter.scrooge.ThriftStruct
 
 import au.com.cba.omnia.maestro.core.task._
 import au.com.cba.omnia.maestro.core.args.Config
-import au.com.cba.omnia.maestro.core.misc.Miscellaneous
 
 trait MaestroExecutionBase
   extends UploadExecution
@@ -26,11 +25,11 @@ trait MaestroExecutionBase
   with ViewExecution
   with QueryExecution
   with SqoopExecution
-  with Config
-  with Miscellaneous {
+  with Config {
 
   type HiveTable[A <: ThriftStruct, B] = au.com.cba.omnia.maestro.core.hive.HiveTable[A, B]
   type Partition[A, B] = au.com.cba.omnia.maestro.core.partition.Partition[A, B]
+  type TimeSource      = au.com.cba.omnia.maestro.core.time.TimeSource
   type Clean           = au.com.cba.omnia.maestro.core.clean.Clean
   type Validator[A]    = au.com.cba.omnia.maestro.core.validate.Validator[A]
   type RowFilter       = au.com.cba.omnia.maestro.core.filter.RowFilter
@@ -50,6 +49,7 @@ trait MaestroExecutionBase
   val HiveTable     = au.com.cba.omnia.maestro.core.hive.HiveTable
   val Partition     = au.com.cba.omnia.maestro.core.partition.Partition
   val HivePartition = au.com.cba.omnia.maestro.core.partition.HivePartition
+  val TimeSource    = au.com.cba.omnia.maestro.core.time.TimeSource
   val Clean         = au.com.cba.omnia.maestro.core.clean.Clean
   val Validator     = au.com.cba.omnia.maestro.core.validate.Validator
   val Check         = au.com.cba.omnia.maestro.core.validate.Check

@@ -22,6 +22,7 @@ import au.com.cba.omnia.maestro.core.clean.Clean
 import au.com.cba.omnia.maestro.core.codec.{Decode, Tag}
 import au.com.cba.omnia.maestro.core.data.Field
 import au.com.cba.omnia.maestro.core.filter.RowFilter
+import au.com.cba.omnia.maestro.core.time.TimeSource
 import au.com.cba.omnia.maestro.core.validate.Validator
 
 import au.com.cba.omnia.maestro.core.thrift.scrooge.StringPair
@@ -30,11 +31,7 @@ trait LoadTestUtil {
   val clean      = Clean.all()
   val validator  = Validator.all[StringPair]()
   val filter     = RowFilter.keep
-  val now        = {
-    val f = new SimpleDateFormat("yyyy-MM-dd")
-    f.setTimeZone(TimeZone.getTimeZone("UTC"))
-    Predetermined(f.format(new java.util.Date))
-  }
+  val now        = TimeSource.now()
 
   implicit val StringPairDecode: Decode[StringPair] = for {
     first  <- Decode.of[String]

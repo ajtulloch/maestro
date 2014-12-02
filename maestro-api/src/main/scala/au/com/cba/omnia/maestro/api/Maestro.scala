@@ -22,7 +22,8 @@ import au.com.cba.omnia.maestro.macros.MacroSupport
 
 import au.com.cba.omnia.maestro.core.task._
 import au.com.cba.omnia.maestro.core.args.Config
-import au.com.cba.omnia.maestro.core.misc.Miscellaneous
+import au.com.cba.omnia.maestro.core.hdfs.OldGuardFunctions
+import au.com.cba.omnia.maestro.core.time.OldTimeSourceFunctions
 
 /**
   * Parent class for a more complex maestro job that needs to use cascades. For example, to run hive
@@ -54,4 +55,5 @@ object Maestro
     with Upload
     with Sqoop
     with Config
-    with Miscellaneous
+    with OldTimeSourceFunctions
+    with OldGuardFunctions

@@ -37,17 +37,8 @@ import au.com.cba.omnia.maestro.core.clean.Clean
 import au.com.cba.omnia.maestro.core.filter.RowFilter
 import au.com.cba.omnia.maestro.core.scalding.Errors
 import au.com.cba.omnia.maestro.core.split.Splitter
+import au.com.cba.omnia.maestro.core.time.TimeSource
 import au.com.cba.omnia.maestro.core.validate.Validator
-
-sealed trait TimeSource {
-  def getTime(path: String): String = this match {
-    case Predetermined(time) => time
-    case FromPath(extract)  => extract(path)
-  }
-}
-
-case class Predetermined(time: String) extends TimeSource
-case class FromPath(extract: String => String) extends TimeSource
 
 case class RawRow(line: String, extraFields: List[String])
 

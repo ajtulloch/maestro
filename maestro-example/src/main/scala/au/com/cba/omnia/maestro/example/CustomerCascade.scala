@@ -58,7 +58,7 @@ class CustomerCascade(args: Args) extends MaestroCascade[Customer](args) {
     new UniqueJob(args) {
       load[Customer](
         "|", inputs, errors,
-        Maestro.timeFromPath(".*/([0-9]{4})/([0-9]{2})/([0-9]{2}).*".r),
+        timeFromPath(".*/([0-9]{4})/([0-9]{2})/([0-9]{2}).*".r),
         cleaners, validators, filter, "null"
       ) |>
       (viewHive(dateTable) _ &&&

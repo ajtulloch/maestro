@@ -18,6 +18,9 @@ import com.twitter.scrooge.ThriftStruct
 
 package object api {
   type Partition[A, B] = au.com.cba.omnia.maestro.core.partition.Partition[A, B]
+  type TimeSource      = au.com.cba.omnia.maestro.core.time.TimeSource
+  type Predetermined   = au.com.cba.omnia.maestro.core.time.Predetermined
+  type FromPath        = au.com.cba.omnia.maestro.core.time.FromPath
   type Clean           = au.com.cba.omnia.maestro.core.clean.Clean
   type Validator[A]    = au.com.cba.omnia.maestro.core.validate.Validator[A]
   type RowFilter       = au.com.cba.omnia.maestro.core.filter.RowFilter
@@ -32,6 +35,7 @@ package object api {
   type Counters        = au.com.cba.omnia.maestro.core.scalding.Counters
 
   val Partition     = au.com.cba.omnia.maestro.core.partition.Partition
+  val TimeSource    = au.com.cba.omnia.maestro.core.time.TimeSource
   val HivePartition = au.com.cba.omnia.maestro.core.partition.HivePartition
   val Clean         = au.com.cba.omnia.maestro.core.clean.Clean
   val Validator     = au.com.cba.omnia.maestro.core.validate.Validator

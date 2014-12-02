@@ -38,6 +38,7 @@ object CustomerSqoopImportExecution extends MaestroExecution[Customer] {
     val domain     = "books"
     val table      = "customer_import"
     val errors     = s"${hdfsRoot}/errors/${domain}"
+    val timeSource = TimeSource.now()
     val filter     = RowFilter.keep
     val cleaners   = Clean.all(Clean.trim, Clean.removeNonPrintables)
     val validators = Validator.all[Customer]()
@@ -49,7 +50,7 @@ object CustomerSqoopImportExecution extends MaestroExecution[Customer] {
 
     for {
       (path, sqoopCount) <- sqoopImport(hdfsRoot, source, domain, timePath, importOptions)
-      (pipe, loadInfo)   <- load[Customer]("|", List(path), errors, now(), cleaners, validators, filter, "null")
+      (pipe, loadInfo)   <- load[Customer]("|", List(path), errors, timeSource, cleaners, validators, filter, "null")
       if loadInfo.continue
       loadCount = loadInfo.asInstanceOf[LoadSuccess].written
       hiveCount          <- viewHive(catTable)(pipe)
@@ -58,5 +59,3 @@ object CustomerSqoopImportExecution extends MaestroExecution[Customer] {
 }
 
 case class CustomerImportStatus(sqoopCount: Long, loadCount: Long, hiveCount: Long)
-
-

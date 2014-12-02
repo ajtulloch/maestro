@@ -18,6 +18,8 @@ package hdfs
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 
+import au.com.cba.omnia.permafrost.hdfs.Hdfs
+
 case class GuardFilter(filter: (FileSystem, Path) => Boolean) {
   def &&&(that: GuardFilter): GuardFilter =
     GuardFilter((fs, p) => filter(fs, p) && that.filter(fs, p))
@@ -42,14 +44,26 @@ object Guard {
   }
 
   /** Expand the complete file paths from the expandPaths, filtering out directories and 0 byte files */
-  def listNonEmptyFiles(paths: List[String])= {
+  def listNonEmptyFiles(paths: List[String]): List[String] = {
     for {
       eachPath <- paths
       status   <- fs.listStatus(new Path(eachPath))
       if(!status.isDirectory && status.getLen>0)
     } yield status.getPath.toString
   }
-  
+
   /** As `expandPath` but the filter is `NotProcessed` and `IngestionComplete`. */
-  def expandTransferredPaths(path: String) = expandPaths(path, NotProcessed &&& IngestionComplete)
+  def expandTransferredPaths(path: String): List[String] =
+    expandPaths(path, NotProcessed &&& IngestionComplete)
+
+  /** Creates the _PROCESSED flag to indicate completion of processing in given list of paths */
+  def createFlagFile(directoryPath : List[String]) {
+    directoryPath foreach ((x)=> Hdfs.create(Hdfs.path(s"$x/_PROCESSED")).run(new Configuration))
+  }
+}
+
+/** Trait for guard functions that used to be provided via a trait, maintained for backwards compatibility */
+trait OldGuardFunctions {
+  /** Creates the _PROCESSED flag to indicate completion of processing in given list of paths */
+  def createFlagFile(directoryPath : List[String]) { Guard.createFlagFile(directoryPath) }
 }

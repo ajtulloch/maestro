@@ -25,6 +25,7 @@ object CustomerExecution extends MaestroExecution[Customer] {
     val domain      = "customer"
     val tablename   = "customer"
     val errors      = s"${hdfsRoot}/errors/${domain}"
+    val timeSource  = TimeSource.fromDirStructure
     val validators  = Validator.all[Customer]()
     val filter      = RowFilter.keep
     val cleaners    = Clean.all(
@@ -41,8 +42,7 @@ object CustomerExecution extends MaestroExecution[Customer] {
 
       if uploadInfo.continue
       (pipe, loadInfo) <- load[Customer](
-        "|", uploadInfo.files, errors,
-        timeFromPath(".*/([0-9]{4})/([0-9]{2})/([0-9]{2}).*".r),
+        "|", uploadInfo.files, errors, timeSource,
         cleaners, validators, filter, "null"
       )
 
